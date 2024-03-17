@@ -46,3 +46,11 @@ Go to [this site](https://aistudio.google.com/app/apikey) to get a Gemini API ke
 ```
 GOOGLE_API_KEY="API KEY HERE"
 ```
+
+### Cohere API Key
+
+Go to [this site](https://dashboard.cohere.com/api-keys) to get a Cohere API key.
+
+```
+COHERE_API_KEY="API KEY HERE"
+```

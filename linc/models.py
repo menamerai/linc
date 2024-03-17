@@ -64,12 +64,6 @@ class HFModel(BaseModel):
         )
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
-        if self.mode == MODEL_MODE.BASELINE:
-            return self.predict_baseline(doc)
-        elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
-            return self.predict_neurosymbolic(doc)
-
-    def predict_baseline(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
         prompt = self.pg.generate(self.mode, doc)
         generation = self.generator(prompt)[0]["generated_text"]
 
@@ -78,14 +72,22 @@ class HFModel(BaseModel):
             rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", generation, re.DOTALL
         )[-1]
         generation = generation.strip()
+        if self.mode == MODEL_MODE.BASELINE:
+            return self.evaluate_baseline(generation)
+        elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
+            return self.evaluate_neurosymbolic(generation)
 
-        if generation.lower() == "true":
+    def evaluate_baseline(result: str) -> OWA_PRED:
+        if result.lower() == "true":
             return OWA_PRED.TRUE
-        elif generation.lower() == "false":
+        elif result.lower() == "false":
             return OWA_PRED.FALSE
         else:
             # OWA assume uncertain
             return OWA_PRED.UNK
+
+    def evaluate_neurosymbolic(result: str) -> OWA_PRED:
+        return OWA_PRED.UNK  # this is for you to implement
 
 
 if __name__ == "__main__":

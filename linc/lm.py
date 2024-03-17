@@ -1,6 +1,9 @@
+from dataclasses import dataclass, field
+from typing import Optional
+
 import torch
 from custom_types import MODEL_MODE
-from transformers import AutoTokenizer, StoppingCriteria
+from transformers import AutoTokenizer, BitsAndBytesConfig, StoppingCriteria
 from utils import convert_to_nltk_rep
 
 
@@ -8,12 +11,12 @@ class PromptGenerator:
     """train_dataset = "minimario/FOLIO" """
 
     def __init__(self, n: int = 3):
-        self.common_instructions = """
-        The following is a first-order logic (FOL) problem.
-        The problem is to determine whether the conclusion follows from the premises.
-        The premises are given in the form of a set of first-order logic sentences.
-        The conclusion is given in the form of a single first-order logic sentence.
-        """
+        self.common_instructions = (
+            "The following is a first-order logic (FOL) problem.\n"
+        )
+        self.common_instructions += "The problem is to determine whether the conclusion follows from the premises.\n"
+        self.common_instructions += "The premises are given in the form of a set of first-order logic sentences.\n"
+        self.common_instructions += "The conclusion is given in the form of a single first-order logic sentence.\n"
         self.n_shots = n
         self.stop_words = ["</EVALUATE>"]
         """ self.dataset = load_dataset(self.train_dataset, split="train")
@@ -171,6 +174,55 @@ class StopOnWords(StoppingCriteria):
             if torch.equal(input_ids[0][-len(stop_token_id) :], stop_token_id):
                 return True
         return False
+
+
+@dataclass
+class HFModelConfig:
+    """
+    Arguments for HF model configuration
+    """
+
+    model_name: str = field(
+        default="microsoft/phi-2",
+        metadata={"help": "The model name of the transformer model on HF hub"},
+    )
+    pg: PromptGenerator = field(
+        default=PromptGenerator(),
+        metadata={"help": "Prompt generator for the model"},
+    )
+    q_config: Optional[BitsAndBytesConfig] = field(
+        default=BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        ),
+        metadata={"help": "Quantization configuration for the model"},
+    )
+    quantize: bool = field(
+        default=False,
+        metadata={"help": "Whether to quantize the model or not"},
+    )
+    mode: MODEL_MODE = field(
+        default=MODEL_MODE.BASELINE,
+        metadata={"help": "Mode of the model, between baseline and neurosymbolic"},
+    )
+    device: torch.device = field(
+        default=(
+            torch.device("cpu")
+            if not torch.cuda.is_available()
+            else torch.device("cuda")
+        ),
+        metadata={"help": "Device to run the model on"},
+    )
+    max_length: int = field(
+        default=4096,
+        metadata={"help": "Maximum length of the generated text (prompt included)"},
+    )
+    num_beams: int = field(
+        default=1,  # 1 means greedy search
+        metadata={"help": "Number of beams for the generation, used for beam search"},
+    )
 
 
 if __name__ == "__main__":

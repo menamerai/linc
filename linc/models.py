@@ -4,14 +4,12 @@ from abc import ABC
 import cohere
 import google.generativeai as genai
 import numpy as np
-import torch
-from custom_types import OWA_PRED
+from custom_types import *
 from lm import *
 from logic import get_all_variables, prove
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    BitsAndBytesConfig,
     StoppingCriteriaList,
     pipeline,
 )
@@ -49,48 +47,31 @@ class RandomModel(BaseModel):
 class HFModel(BaseModel):
     def __init__(
         self,
-        model_name: str,
-        tokenizer_name: str,
-        mode: MODEL_MODE,
-        pg: PromptGenerator,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        max_new_tokens: int = 50,
-        quantization: bool = False,
+        config: HFModelConfig,
     ) -> None:
-        self.mode = mode
-        self.device = device
-        self.pg = pg
-        q_config = (
-            BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-            )
-            if quantization
-            else None
-        )
+        self.config = config
+        self.pg = config.pg
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            quantization_config=q_config,
+            config.model_name,
+            quantization_config=config.q_config,
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_name, truncation_side="left"
+            config.model_name, truncation_side="left"
         )
         self.generator = pipeline(
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
-            max_new_tokens=max_new_tokens,
+            max_length=config.max_length,
             stopping_criteria=StoppingCriteriaList(
-                [StopOnWords(self.pg.stop_words, self.tokenizer, device)]
+                [StopOnWords(self.pg.stop_words, self.tokenizer, config.device)]
             ),
             pad_token_id=self.tokenizer.eos_token_id,
-            # we can try beam search here, but i don't have the GPU for it
+            num_beams=config.num_beams,
         )
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
-        prompt = self.pg.generate(self.mode, doc)
+        prompt = self.pg.generate(self.config.mode, doc)
         generation = self.generator(prompt)[0]["generated_text"]
 
         # get LAST element between <EVALUATE> tags using regex
@@ -99,9 +80,9 @@ class HFModel(BaseModel):
             rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", generation, re.DOTALL
         )[-1]
         generation = generation.strip()
-        if self.mode == MODEL_MODE.BASELINE:
+        if self.config.mode == MODEL_MODE.BASELINE:
             return self.evaluate_baseline(generation)
-        elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
+        elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
             return self.evaluate_neurosymbolic(generation)
 
 
@@ -213,14 +194,13 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    model = HFModel(
-        "microsoft/phi-2",
-        "microsoft/phi-2",
-        MODEL_MODE.BASELINE,
-        PromptGenerator(),
-        max_new_tokens=50,
-        quantization=True,
+    hf_config = HFModelConfig(
+        model_name="microsoft/phi-2",
+        quantize=True,
+        num_beams=5,
     )
+
+    model = HFModel(hf_config)
 
     print(model.predict(example_doc))
 

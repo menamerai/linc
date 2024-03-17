@@ -175,6 +175,14 @@ class StopOnWords(StoppingCriteria):
                 return True
         return False
 
+def bnb_factory():
+    return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+
 
 @dataclass
 class HFModelConfig:
@@ -191,12 +199,7 @@ class HFModelConfig:
         metadata={"help": "Prompt generator for the model"},
     )
     q_config: Optional[BitsAndBytesConfig] = field(
-        default=BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
-        ),
+        default_factory=bnb_factory,
         metadata={"help": "Quantization configuration for the model"},
     )
     quantize: bool = field(

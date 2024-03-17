@@ -32,7 +32,11 @@ class BaseModel(ABC):
             return OWA_PRED.UNK
 
     def evaluate_neurosymbolic(self, result: str) -> OWA_PRED:
-        return OWA_PRED.UNK  # this is for you to implement
+        lines = result.split('\n')
+        fol_lines = lines[1::2] # this is a hack but fuck it we ball
+        fol_lines = [l[l.find(':') + 1:].strip() for l in fol_lines] # hope you like debugging listcomps lmfao
+        premises, conclusion = fol_lines[:-1], fol_lines[-1]
+        return prove(premises, conclusion)
 
 
 class RandomModel(BaseModel):
@@ -195,7 +199,7 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    """ hf_config = HFModelConfig(
+    hf_config = HFModelConfig(
         model_name="microsoft/phi-2",
         quantize=True,
         num_beams=5,
@@ -203,20 +207,20 @@ if __name__ == "__main__":
 
     model = HFModel(hf_config)
 
-    print(model.predict(example_doc)) """
+    print(model.predict(example_doc))
 
-    """ gemini_config = GeminiModelConfig(
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
-    )
+    # gemini_config = GeminiModelConfig(
+    #     google_api_key=os.getenv("GOOGLE_API_KEY"),
+    # )
 
-    model = GeminiModel(gemini_config)
+    # model = GeminiModel(gemini_config)
 
-    print(model.predict(example_doc)) """
+    # print(model.predict(example_doc))
 
-    cohere_config = CohereModelConfig(
-        api_key=os.getenv("COHERE_API_KEY"),
-    )
+    # cohere_config = CohereModelConfig(
+    #     api_key=os.getenv("COHERE_API_KEY"),
+    # )
 
-    model = CohereModel(cohere_config)
+    # model = CohereModel(cohere_config)
 
-    print(model.predict(example_doc, n=5))
+    # print(model.predict(example_doc, n=5))

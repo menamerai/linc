@@ -5,7 +5,7 @@ from enum import Enum
 import numpy as np
 import torch
 from lm import *
-from logic import *
+from logic import prove, get_all_variables
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -13,7 +13,7 @@ from transformers import (
     pipeline,
 )
 
-OWA_PRED = Enum("PRED", ["FALSE", "TRUE", "UNK"])
+from pred_types import OWA_PRED
 
 
 class BaseModel(ABC):
@@ -87,6 +87,7 @@ class HFModel(BaseModel):
             return OWA_PRED.UNK
 
     def evaluate_neurosymbolic(result: str) -> OWA_PRED:
+        # TODO: not sure what to do here; are FOL expressions \n split?
         return OWA_PRED.UNK  # this is for you to implement
 
 

@@ -195,7 +195,7 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    """ hf_config = HFModelConfig(
+    hf_config = HFModelConfig(
         model_name="microsoft/phi-2",
         quantize=True,
         num_beams=5,
@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
     model = HFModel(hf_config)
 
-    print(model.predict(example_doc)) """
+    print(model.predict(example_doc))
 
     """ gemini_config = GeminiModelConfig(
         google_api_key=os.getenv("GOOGLE_API_KEY"),
@@ -213,10 +213,10 @@ if __name__ == "__main__":
 
     print(model.predict(example_doc)) """
 
-    cohere_config = CohereModelConfig(
+    """ cohere_config = CohereModelConfig(
         api_key=os.getenv("COHERE_API_KEY"),
     )
 
     model = CohereModel(cohere_config)
 
-    print(model.predict(example_doc, n=5))
+    print(model.predict(example_doc, n=5)) """

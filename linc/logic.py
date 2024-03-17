@@ -52,8 +52,8 @@ def format_fol(s: str) -> str:
 
 def prove(premises: List[str], conclusion: str) -> OWA_PRED:
     # format for NLTK just bc
-    premises = [convert_to_nltk_rep(p) for p in premises]
-    conclusion = convert_to_nltk_rep(conclusion)
+    # premises = [convert_to_nltk_rep(p) for p in premises]
+    # conclusion = convert_to_nltk_rep(conclusion)
 
     # parse the expressions into nltk Expression objects
     prem_exprs = [read_expr(format_fol(p)) for p in premises]

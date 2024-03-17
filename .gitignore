@@ -160,4 +160,5 @@ cython_debug/
 #.idea/
 
 proofwriter-dataset/
-*.lock
+*.lock.DS_Store
+.DS_Store

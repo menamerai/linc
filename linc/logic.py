@@ -1,10 +1,10 @@
 import re
 from typing import List
 
+from custom_types import OWA_PRED
 from nltk.inference import Prover9
 from nltk.inference.prover9 import Prover9FatalException
 from nltk.sem import Expression
-from pred_types import OWA_PRED
 from utils import convert_to_nltk_rep
 
 # hack to get the parsing function into a cleaner form

@@ -1,6 +1,7 @@
 import re
 
 from nltk.inference import Prover9
+from nltk.inference.prover9 import Prover9FatalException
 from nltk.sem import Expression
 
 from typing import List
@@ -109,11 +110,20 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
     prem_exprs = [read_expr(format_fol(p)) for p in premises]
     conc_expr = read_expr(format_fol(conclusion))
 
-    conc_provable = prover.prove(conc_expr, prem_exprs)
-    print(conc_provable)
+    # attempt to prove whether the conclusion is true from the premises
+    try:
+        conc_provable = prover.prove(conc_expr, prem_exprs)
+    except Prover9FatalException as e:
+        return OWA_PRED.ERR
+
+    # attempt to prove whether the conclusion is deniable from the premises
     # this is a bit of a hack, but use short circuit eval to avoid second proving if possible
-    conc_deniable = (not conc_provable) and prover.prove(conc_expr.negate(), prem_exprs)
-    print(conc_deniable)
+    try:
+        conc_deniable = (not conc_provable) and prover.prove(conc_expr.negate(), prem_exprs)
+    except Prover9FatalException as e:
+        return OWA_PRED.ERR
+
+    # return the according OWA flag
     if conc_provable:
         return OWA_PRED.TRUE
     elif conc_deniable:

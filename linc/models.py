@@ -12,6 +12,7 @@ from pred_types import OWA_PRED
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    BitsAndBytesConfig,
     StoppingCriteriaList,
     pipeline,
 )
@@ -55,11 +56,25 @@ class HFModel(BaseModel):
         pg: PromptGenerator,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         max_new_tokens: int = 50,
+        quantization: bool = False,
     ) -> None:
         self.mode = mode
         self.device = device
         self.pg = pg
-        self.model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
+        q_config = (
+            BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            if quantization
+            else None
+        )
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            quantization_config=q_config,
+        )
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_name, truncation_side="left"
         )
@@ -67,7 +82,6 @@ class HFModel(BaseModel):
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
-            device=device,
             max_new_tokens=max_new_tokens,
             stopping_criteria=StoppingCriteriaList(
                 [StopOnWords(self.pg.stop_words, self.tokenizer, device)]
@@ -200,15 +214,16 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    """ model = HFModel(
+    model = HFModel(
         "microsoft/phi-2",
         "microsoft/phi-2",
         MODEL_MODE.BASELINE,
         PromptGenerator(),
         max_new_tokens=50,
+        quantization=True,
     )
 
-    print(model.predict(example_doc)) """
+    print(model.predict(example_doc))
 
     """ model = GeminiModel(
         os.getenv("GOOGLE_API_KEY"), PromptGenerator(), MODEL_MODE.BASELINE
@@ -216,8 +231,8 @@ if __name__ == "__main__":
 
     print(model.predict(example_doc)) """
 
-    model = CohereModel(
+    """ model = CohereModel(
         os.getenv("COHERE_API_KEY"), PromptGenerator(), MODEL_MODE.BASELINE
     )
 
-    print(model.predict(example_doc))
+    print(model.predict(example_doc)) """

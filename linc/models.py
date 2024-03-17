@@ -6,7 +6,12 @@ import numpy as np
 import torch
 from lm import *
 from logic import *
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    StoppingCriteriaList,
+    pipeline,
+)
 
 OWA_PRED = Enum("PRED", ["FALSE", "TRUE", "UNK"])
 
@@ -36,7 +41,11 @@ class HFModel(BaseModel):
         mode: MODEL_MODE,
         pg: PromptGenerator,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        max_new_tokens: int = 20,
     ) -> None:
+        self.mode = mode
+        self.device = device
+        self.pg = pg
         self.model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_name, truncation_side="left"
@@ -45,12 +54,14 @@ class HFModel(BaseModel):
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
-            max_length=4096,
             device=device,
+            max_new_tokens=max_new_tokens,
+            stopping_criteria=StoppingCriteriaList(
+                [StopOnWords(self.pg.stop_words, self.tokenizer, device)]
+            ),
+            pad_token_id=self.tokenizer.eos_token_id,
+            # we can try beam search here, but i don't have the GPU for it
         )
-        self.mode = mode
-        self.pg = pg
-        self.device = device
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
         if self.mode == MODEL_MODE.BASELINE:
@@ -61,10 +72,11 @@ class HFModel(BaseModel):
     def predict_baseline(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
         prompt = self.pg.generate(self.mode, doc)
         generation = self.generator(prompt)[0]["generated_text"]
-        # get everything between <EVALUATE> tags using regex
-        generation = re.search(
-            rf"{self.pg.container[0]}(.*?){self.pg.container[1]}", generation, re.DOTALL
-        ).group(1)
+
+        # get LAST element between <EVALUATE> tags using regex
+        generation = re.findall(
+            rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", generation, re.DOTALL
+        )[-1]
         generation = generation.strip()
 
         if generation.lower() == "true":
@@ -105,6 +117,7 @@ if __name__ == "__main__":
         "microsoft/phi-2",
         MODEL_MODE.BASELINE,
         PromptGenerator(),
+        max_new_tokens=50,
     )
 
     print(model.predict(example_doc))

@@ -3,6 +3,7 @@ from abc import ABC
 from enum import Enum
 
 import numpy as np
+import torch
 from lm import *
 from logic import *
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
@@ -34,8 +35,9 @@ class HFModel(BaseModel):
         tokenizer_name: str,
         mode: MODEL_MODE,
         pg: PromptGenerator,
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ) -> None:
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_name, truncation_side="left"
         )
@@ -44,9 +46,11 @@ class HFModel(BaseModel):
             model=self.model,
             tokenizer=self.tokenizer,
             max_length=4096,
+            device=device,
         )
         self.mode = mode
         self.pg = pg
+        self.device = device
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
         if self.mode == MODEL_MODE.BASELINE:

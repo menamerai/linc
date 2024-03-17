@@ -2,19 +2,19 @@ import re
 from abc import ABC
 from enum import Enum
 
+import cohere
 import google.generativeai as genai
 import numpy as np
 import torch
 from lm import *
-from logic import prove, get_all_variables
+from logic import get_all_variables, prove
+from pred_types import OWA_PRED
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     StoppingCriteriaList,
     pipeline,
 )
-
-from pred_types import OWA_PRED
 
 
 class BaseModel(ABC):
@@ -115,13 +115,49 @@ class GeminiModel(BaseModel):
                 candidate_count=1,  # we can increase this later
                 max_output_tokens=self.max_new_tokens,
                 # the stop sequences are NOT included in the output
-                stop_sequences=["</EVALUATE>", "<PREMISE>", "<CONCLUSION>"],
+                stop_sequences=["</EVALUATE>"],
             ),
         )
         text = generation.text  # might be different for multiple candidates
         text = text.strip()
         # since the generation stops at </EVALUATE>, and does not include the prompt
         # just generation.text is exactly what we need
+        if self.mode == MODEL_MODE.BASELINE:
+            return self.evaluate_baseline(text)
+        elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
+            return self.evaluate_neurosymbolic(text)
+
+
+class CohereModel(BaseModel):
+    def __init__(
+        self,
+        api_key: str,
+        pg: PromptGenerator,
+        mode: MODEL_MODE,
+        model_name: str = "command",
+        max_new_tokens: int = 50,
+    ) -> None:
+        self.pg = pg
+        self.mode = mode
+        self.max_new_tokens = max_new_tokens
+        self.model = cohere.Client(api_key=api_key)
+        self.model_name = model_name
+
+    def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
+        prompt = self.pg.generate(self.mode, doc)
+        # generate is legacy, cohere is asking us to use chat instead
+        # but chat doesn't have a stop_sequences parameter
+        # read more here https://docs.cohere.com/docs/migrating-from-cogenerate-to-cochat
+        generation = self.model.generate(
+            prompt,
+            end_sequences=["</EVALUATE>"],
+            max_tokens=self.max_new_tokens,
+            num_generations=1,
+            model=self.model_name,
+        )
+
+        text = generation[0].text
+        text = text.strip()
         if self.mode == MODEL_MODE.BASELINE:
             return self.evaluate_baseline(text)
         elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
@@ -174,8 +210,14 @@ if __name__ == "__main__":
 
     print(model.predict(example_doc)) """
 
-    model = GeminiModel(
+    """ model = GeminiModel(
         os.getenv("GOOGLE_API_KEY"), PromptGenerator(), MODEL_MODE.BASELINE
+    )
+
+    print(model.predict(example_doc)) """
+
+    model = CohereModel(
+        os.getenv("COHERE_API_KEY"), PromptGenerator(), MODEL_MODE.BASELINE
     )
 
     print(model.predict(example_doc))

@@ -17,6 +17,7 @@ accelerate = "^0.28.0"
 diskcache = "^5.6.3"
 google-generativeai = "^0.4.1"
 python-dotenv = "^1.0.1"
+cohere = "^4.56"
 
 
 [tool.poetry.group.dev.dependencies]

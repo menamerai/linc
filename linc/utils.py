@@ -1,5 +1,7 @@
 import re
 
+from transformers import BitsAndBytesConfig
+
 
 def convert_to_nltk_rep(logic_formula):
     # THIS IS A DIRECT COPY FROM THE LINC REPO, REMOVE THIS CODE WHEN SUBMIT
@@ -102,3 +104,12 @@ def convert_to_nltk_rep(logic_formula):
     logic_formula = re.sub(special_xor_pattern, replace_special_xor, logic_formula)
 
     return logic_formula
+
+
+def bnb_factory():
+    return BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+    )

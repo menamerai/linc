@@ -1,14 +1,13 @@
 import re
 from abc import ABC
-from enum import Enum
 
 import cohere
 import google.generativeai as genai
 import numpy as np
 import torch
+from custom_types import OWA_PRED
 from lm import *
 from logic import get_all_variables, prove
-from pred_types import OWA_PRED
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,

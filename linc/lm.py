@@ -1,10 +1,7 @@
-from enum import Enum
-
 import torch
+from custom_types import MODEL_MODE
 from transformers import AutoTokenizer, StoppingCriteria
 from utils import convert_to_nltk_rep
-
-MODEL_MODE = Enum("MODEL_MODE", ["BASELINE", "NEUROSYMBOLIC"])
 
 
 class PromptGenerator:

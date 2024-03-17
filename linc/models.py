@@ -89,25 +89,20 @@ class HFModel(BaseModel):
 class GeminiModel(BaseModel):
     def __init__(
         self,
-        google_api_key: str,
-        pg: PromptGenerator,
-        mode: MODEL_MODE,
-        model_name: str = "gemini-pro",
-        max_new_tokens: int = 50,
+        config: GeminiModelConfig,
     ) -> None:
-        genai.configure(api_key=google_api_key)
-        self.model = genai.GenerativeModel(model_name)
-        self.pg = pg
-        self.mode = mode
-        self.max_new_tokens = max_new_tokens
+        self.config = config
+        genai.configure(api_key=config.google_api_key)
+        self.model = genai.GenerativeModel(config.model_name)
+        self.pg = config.pg
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
-        prompt = self.pg.generate(self.mode, doc)
+        prompt = self.pg.generate(self.config.mode, doc)
         generation = self.model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
-                candidate_count=1,  # we can increase this later
-                max_output_tokens=self.max_new_tokens,
+                candidate_count=1,  # looks like multiple candidates are not supported
+                max_output_tokens=self.config.max_new_tokens,
                 # the stop sequences are NOT included in the output
                 stop_sequences=["</EVALUATE>"],
             ),
@@ -116,46 +111,52 @@ class GeminiModel(BaseModel):
         text = text.strip()
         # since the generation stops at </EVALUATE>, and does not include the prompt
         # just generation.text is exactly what we need
-        if self.mode == MODEL_MODE.BASELINE:
+        if self.config.mode == MODEL_MODE.BASELINE:
             return self.evaluate_baseline(text)
-        elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
+        elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
             return self.evaluate_neurosymbolic(text)
 
 
 class CohereModel(BaseModel):
     def __init__(
         self,
-        api_key: str,
-        pg: PromptGenerator,
-        mode: MODEL_MODE,
-        model_name: str = "command",
-        max_new_tokens: int = 50,
+        config: CohereModelConfig,
     ) -> None:
-        self.pg = pg
-        self.mode = mode
-        self.max_new_tokens = max_new_tokens
-        self.model = cohere.Client(api_key=api_key)
-        self.model_name = model_name
+        self.config = config
+        self.model = cohere.Client(api_key=config.api_key)
+        self.pg = config.pg
 
-    def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
-        prompt = self.pg.generate(self.mode, doc)
+    def predict(
+        self, doc: dict[str, str | list[str]], n: int = 1
+    ) -> OWA_PRED | list[OWA_PRED]:
+        prompt = self.pg.generate(self.config.mode, doc)
         # generate is legacy, cohere is asking us to use chat instead
         # but chat doesn't have a stop_sequences parameter
         # read more here https://docs.cohere.com/docs/migrating-from-cogenerate-to-cochat
         generation = self.model.generate(
             prompt,
             end_sequences=["</EVALUATE>"],
-            max_tokens=self.max_new_tokens,
-            num_generations=1,
-            model=self.model_name,
+            max_tokens=self.config.max_new_tokens,
+            num_generations=n,
+            model=self.config.model_name,
         )
 
-        text = generation[0].text
-        text = text.strip()
-        if self.mode == MODEL_MODE.BASELINE:
-            return self.evaluate_baseline(text)
-        elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
-            return self.evaluate_neurosymbolic(text)
+        if n == 1:
+            text = generation[0].text
+            text = text.strip()
+            if self.config.mode == MODEL_MODE.BASELINE:
+                return self.evaluate_baseline(text)
+            elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
+                return self.evaluate_neurosymbolic(text)
+
+        elif n > 1:
+            if self.config.mode == MODEL_MODE.BASELINE:
+                return [self.evaluate_baseline(g.text.strip()) for g in generation]
+            elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
+                return [self.evaluate_neurosymbolic(g.text.strip()) for g in generation]
+
+        else:
+            raise ValueError("n must be a positive integer")
 
 
 if __name__ == "__main__":
@@ -194,7 +195,7 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    hf_config = HFModelConfig(
+    """ hf_config = HFModelConfig(
         model_name="microsoft/phi-2",
         quantize=True,
         num_beams=5,
@@ -202,16 +203,20 @@ if __name__ == "__main__":
 
     model = HFModel(hf_config)
 
-    print(model.predict(example_doc))
+    print(model.predict(example_doc)) """
 
-    """ model = GeminiModel(
-        os.getenv("GOOGLE_API_KEY"), PromptGenerator(), MODEL_MODE.BASELINE
+    """ gemini_config = GeminiModelConfig(
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
     )
+
+    model = GeminiModel(gemini_config)
 
     print(model.predict(example_doc)) """
 
-    """ model = CohereModel(
-        os.getenv("COHERE_API_KEY"), PromptGenerator(), MODEL_MODE.BASELINE
+    cohere_config = CohereModelConfig(
+        api_key=os.getenv("COHERE_API_KEY"),
     )
 
-    print(model.predict(example_doc)) """
+    model = CohereModel(cohere_config)
+
+    print(model.predict(example_doc, n=5))

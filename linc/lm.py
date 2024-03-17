@@ -225,6 +225,60 @@ class HFModelConfig:
     )
 
 
+@dataclass
+class GeminiModelConfig:
+    """
+    Arguments for Gemini model configuration
+    """
+
+    google_api_key: str = field(
+        metadata={"help": "Google API key for the Gemini model"},
+    )
+    pg: PromptGenerator = field(
+        default=PromptGenerator(),
+        metadata={"help": "Prompt generator for the model"},
+    )
+    mode: MODEL_MODE = field(
+        default=MODEL_MODE.BASELINE,
+        metadata={"help": "Mode of the model, between baseline and neurosymbolic"},
+    )
+    model_name: str = field(
+        default="gemini-pro",
+        metadata={"help": "The model name of the Gemini model"},
+    )
+    max_new_tokens: int = field(
+        default=1000,
+        metadata={"help": "Maximum number of new tokens to generate"},
+    )
+
+
+@dataclass
+class CohereModelConfig:
+    """
+    Arguments for Cohere model configuration
+    """
+
+    api_key: str = field(
+        metadata={"help": "API key for the Cohere model"},
+    )
+    pg: PromptGenerator = field(
+        default=PromptGenerator(),
+        metadata={"help": "Prompt generator for the model"},
+    )
+    mode: MODEL_MODE = field(
+        default=MODEL_MODE.BASELINE,
+        metadata={"help": "Mode of the model, between baseline and neurosymbolic"},
+    )
+    model_name: str = field(
+        default="command",
+        metadata={"help": "The model name of the Cohere model"},
+    )
+    max_new_tokens: int = field(
+        default=1000,
+        metadata={"help": "Maximum number of new tokens to generate"},
+    )
+
+
 if __name__ == "__main__":
     prompt_gen = PromptGenerator()
     prompt = prompt_gen.get_examples(MODEL_MODE.NEUROSYMBOLIC, 3)

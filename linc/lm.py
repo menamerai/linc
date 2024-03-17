@@ -1,6 +1,7 @@
 from enum import Enum
 
-from datasets import load_dataset
+import torch
+from transformers import AutoTokenizer, StoppingCriteria
 from utils import convert_to_nltk_rep
 
 MODEL_MODE = Enum("MODEL_MODE", ["BASELINE", "NEUROSYMBOLIC"])
@@ -8,8 +9,6 @@ MODEL_MODE = Enum("MODEL_MODE", ["BASELINE", "NEUROSYMBOLIC"])
 
 class PromptGenerator:
     """train_dataset = "minimario/FOLIO" """
-
-    container = ("<EVALUATE>", "</EVALUATE>")
 
     def __init__(self, n: int = 3):
         self.common_instructions = """
@@ -19,6 +18,7 @@ class PromptGenerator:
         The conclusion is given in the form of a single first-order logic sentence.
         """
         self.n_shots = n
+        self.stop_words = ["</EVALUATE>"]
         """ self.dataset = load_dataset(self.train_dataset, split="train")
         self.n_indices = [23, 60, 125]  # true, false, uncertain """
 
@@ -148,6 +148,32 @@ class PromptGenerator:
 
     def __call__(self, mode: MODEL_MODE, s: str) -> str:
         return self.generate(mode, s)
+
+
+class StopOnWords(StoppingCriteria):
+    # stopper if the model generated <\EVALUATE>
+    def __init__(
+        self, stop_words: list[str], tokenizer: AutoTokenizer, device: str = "cpu"
+    ):
+        self.stop_words = stop_words
+        self.tokenizer = tokenizer
+        self.device = device
+
+    def __call__(
+        self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs
+    ):
+        stop_token_ids = [
+            self.tokenizer.encode(word, add_special_tokens=False, return_tensors="pt")[
+                0
+            ].to(self.device)
+            for word in self.stop_words
+        ]
+        for stop_token_id in stop_token_ids:
+            # check last n tokens with n = len(token_id)
+            # print(f"test {self.tokenizer.batch_decode(input_ids[0][-len(stop_token_id):])} against {self.tokenizer.batch_decode(stop_token_ids)}")
+            if torch.equal(input_ids[0][-len(stop_token_id) :], stop_token_id):
+                return True
+        return False
 
 
 if __name__ == "__main__":

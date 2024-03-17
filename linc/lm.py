@@ -3,14 +3,15 @@ from enum import Enum
 from datasets import load_dataset
 from utils import convert_to_nltk_rep
 
-PROMPT_MODES = Enum("PROMPT_MODES", ["BASELINE", "NEUROSYMBOLIC"])
+MODEL_MODE = Enum("MODEL_MODE", ["BASELINE", "NEUROSYMBOLIC"])
 
 
 class PromptGenerator:
     """train_dataset = "minimario/FOLIO" """
 
+    container = ("<EVALUATE>", "</EVALUATE>")
+
     def __init__(self, n: int = 3):
-        self.modes = [s for s in PROMPT_MODES]
         self.common_instructions = """
         The following is a first-order logic (FOL) problem.
         The problem is to determine whether the conclusion follows from the premises.
@@ -21,12 +22,12 @@ class PromptGenerator:
         """ self.dataset = load_dataset(self.train_dataset, split="train")
         self.n_indices = [23, 60, 125]  # true, false, uncertain """
 
-    def generate(self, mode: PROMPT_MODES, doc: dict[str, str | list[str]]) -> str:
+    def generate(self, mode: MODEL_MODE, doc: dict[str, str | list[str]]) -> str:
         # instructions
         prompt = self.common_instructions
-        if mode == PROMPT_MODES.BASELINE:
+        if mode == MODEL_MODE.BASELINE:
             prompt += "The task is to evaluate the conclusion as 'True', 'False', or 'Uncertain' given the premises.\n\n"
-        elif mode == PROMPT_MODES.NEUROSYMBOLIC:
+        elif mode == MODEL_MODE.NEUROSYMBOLIC:
             prompt += "The task is to translate each of the premises and conclusions into FOL expressions, "
             prompt += "so that the expressions can be evaluated by a theorem solver to determine whether the conclusion follows from the premises."
             prompt += "Expressions should be adhere to the format of the Python NLTK package logic module.\n\n"
@@ -34,7 +35,7 @@ class PromptGenerator:
             raise ValueError(f"Invalid mode: {mode}, expected one of {self.modes}")
 
         # get examples
-        if self.n_shots > 0 and mode == PROMPT_MODES.BASELINE:
+        if self.n_shots > 0 and mode == MODEL_MODE.BASELINE:
             prompt += self.get_and_format_example(mode)
 
         # write frame for problem
@@ -49,7 +50,7 @@ class PromptGenerator:
 
         return prompt
 
-    def get_and_format_example(self, mode: PROMPT_MODES) -> str:
+    def get_and_format_example(self, mode: MODEL_MODE) -> str:
         examples = self.get_examples(mode, self.n_shots)
         formatted_examples = ""
         for example in examples:
@@ -61,9 +62,9 @@ class PromptGenerator:
             formatted_examples += example["conclusion"] + "\n"
             formatted_examples += "</CONCLUSION>\n"
             formatted_examples += "<EVALUATE>\n"
-            if mode == PROMPT_MODES.BASELINE:
+            if mode == MODEL_MODE.BASELINE:
                 formatted_examples += example["label"] + "\n"
-            elif mode == PROMPT_MODES.NEUROSYMBOLIC:
+            elif mode == MODEL_MODE.NEUROSYMBOLIC:
                 for premise, fol in zip(examples["premises"], examples["premises_FOL"]):
                     formatted_examples += f"TEXT: {premise}\n"
                     formatted_examples += f"FOL: {fol}\n"
@@ -72,7 +73,7 @@ class PromptGenerator:
         return formatted_examples
 
     def get_examples(
-        self, mode: PROMPT_MODES, n: int
+        self, mode: MODEL_MODE, n: int
     ) -> list[dict[str, str | list[str]]]:
         # let's make a static dict of examples for now
         assert n <= 3, "Only 3 examples available"
@@ -137,7 +138,7 @@ class PromptGenerator:
             },
         ]
 
-        if mode == PROMPT_MODES.NEUROSYMBOLIC:
+        if mode == MODEL_MODE.NEUROSYMBOLIC:
             for example in examples:
                 example["premises_FOL"] = [
                     convert_to_nltk_rep(premise) for premise in example["premises"]
@@ -145,11 +146,11 @@ class PromptGenerator:
 
         return examples[:n]
 
-    def __call__(self, mode: PROMPT_MODES, s: str) -> str:
+    def __call__(self, mode: MODEL_MODE, s: str) -> str:
         return self.generate(mode, s)
 
 
 if __name__ == "__main__":
     prompt_gen = PromptGenerator()
-    prompt = prompt_gen.get_examples(PROMPT_MODES.NEUROSYMBOLIC, 3)
+    prompt = prompt_gen.get_examples(MODEL_MODE.NEUROSYMBOLIC, 3)
     print(prompt)

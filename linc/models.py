@@ -2,6 +2,7 @@ import re
 from abc import ABC
 from enum import Enum
 
+import google.generativeai as genai
 import numpy as np
 import torch
 from lm import *
@@ -23,6 +24,18 @@ class BaseModel(ABC):
     def predict(s: str) -> OWA_PRED:
         raise NotImplementedError("prediction method not implemented")
 
+    def evaluate_baseline(self, result: str) -> OWA_PRED:
+        if result.lower() == "true":
+            return OWA_PRED.TRUE
+        elif result.lower() == "false":
+            return OWA_PRED.FALSE
+        else:
+            # OWA assume uncertain
+            return OWA_PRED.UNK
+
+    def evaluate_neurosymbolic(self, result: str) -> OWA_PRED:
+        return OWA_PRED.UNK  # this is for you to implement
+
 
 class RandomModel(BaseModel):
     def __init__(self, **kwargs) -> None:
@@ -41,7 +54,7 @@ class HFModel(BaseModel):
         mode: MODEL_MODE,
         pg: PromptGenerator,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        max_new_tokens: int = 20,
+        max_new_tokens: int = 50,
     ) -> None:
         self.mode = mode
         self.device = device
@@ -68,6 +81,7 @@ class HFModel(BaseModel):
         generation = self.generator(prompt)[0]["generated_text"]
 
         # get LAST element between <EVALUATE> tags using regex
+        # TODO: write different regex for neurosymbolic mode
         generation = re.findall(
             rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", generation, re.DOTALL
         )[-1]
@@ -77,21 +91,50 @@ class HFModel(BaseModel):
         elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
             return self.evaluate_neurosymbolic(generation)
 
-    def evaluate_baseline(result: str) -> OWA_PRED:
-        if result.lower() == "true":
-            return OWA_PRED.TRUE
-        elif result.lower() == "false":
-            return OWA_PRED.FALSE
-        else:
-            # OWA assume uncertain
-            return OWA_PRED.UNK
 
-    def evaluate_neurosymbolic(result: str) -> OWA_PRED:
-        # TODO: not sure what to do here; are FOL expressions \n split?
-        return OWA_PRED.UNK  # this is for you to implement
+class GeminiModel(BaseModel):
+    def __init__(
+        self,
+        google_api_key: str,
+        pg: PromptGenerator,
+        mode: MODEL_MODE,
+        model_name: str = "gemini-pro",
+        max_new_tokens: int = 50,
+    ) -> None:
+        genai.configure(api_key=google_api_key)
+        self.model = genai.GenerativeModel(model_name)
+        self.pg = pg
+        self.mode = mode
+        self.max_new_tokens = max_new_tokens
+
+    def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
+        prompt = self.pg.generate(self.mode, doc)
+        generation = self.model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                candidate_count=1,  # we can increase this later
+                max_output_tokens=self.max_new_tokens,
+                # the stop sequences are NOT included in the output
+                stop_sequences=["</EVALUATE>", "<PREMISE>", "<CONCLUSION>"],
+            ),
+        )
+        text = generation.text  # might be different for multiple candidates
+        text = text.strip()
+        # since the generation stops at </EVALUATE>, and does not include the prompt
+        # just generation.text is exactly what we need
+        if self.mode == MODEL_MODE.BASELINE:
+            return self.evaluate_baseline(text)
+        elif self.mode == MODEL_MODE.NEUROSYMBOLIC:
+            return self.evaluate_neurosymbolic(text)
 
 
 if __name__ == "__main__":
+    import os
+
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     example_doc = {
         "premises": [
             "If a city hold a Summer Olympics, and the city is a US city, then the Summer Olympics will be in the US.",
@@ -107,20 +150,32 @@ if __name__ == "__main__":
         ],
         "conclusion": "The 2028 Summer Olympics will take place in the US.",
         "premises_FOL": [
-            "∀x ∀y (LaLiga(x) ∧ LaLiga(y) ∧ MorePoints(x, y) → HigherRank(x, y))",
-            "∀x ∀y (LaLiga(x) ∧ LaLiga(y) ∧ ¬MorePoints(x, y) ∧ ¬MorePoints(y, x) ∧ MorePointsInGameBetween(x, y) → HigherRank(x, y))",
-            "LaLiga(realMadrid) ∧ LaLiga(barcelona)",
-            "MorePoints(realMadrid, barcelona)",
-            "¬MorePointsInGameBetween(realMadrid, barcelona) ∧ ¬MorePointsInGameBetween(barcelona, realMadrid)",
+            "∀x ∀y (SummerOlympicsCity(x, y) ∧ CityInCountry(y, us) → SummerOlympicsCountry(x, us))",
+            "∀x ∀y (CityInState(x, y) ∧ StateInCountry(y, us) → CityInCountry(x, us))",
+            "∀x ∀y ∀z (CityInState(x, y) ∧ SummerOlympicsCity(z, x) → SummerOlympicsState(z, y))",
+            "SummerOlympicsCity(y2028, la)",
+            "CityInState(la, ca)",
+            "CityInCountry(atlanta, us)",
+            "StateInCountry(ca, us)",
+            "CityInState(atlanta, ga)",
+            "¬InSummerOlympics(y2028, boxing) ∧ ¬InSummerOlympics(y2028, modern_pentathlon) ∧ ¬InSummerOlympics(y2028, weightlifting)",
+            "SummerOlympicsCity(y1996, atlanta)",
         ],
+        # "label": "True",
     }
 
-    model = HFModel(
+    """ model = HFModel(
         "microsoft/phi-2",
         "microsoft/phi-2",
         MODEL_MODE.BASELINE,
         PromptGenerator(),
         max_new_tokens=50,
+    )
+
+    print(model.predict(example_doc)) """
+
+    model = GeminiModel(
+        os.getenv("GOOGLE_API_KEY"), PromptGenerator(), MODEL_MODE.BASELINE
     )
 
     print(model.predict(example_doc))

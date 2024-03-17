@@ -2,7 +2,7 @@
 name = "linc"
 version = "0.1.0"
 description = "Paper implementation of LINC"
-authors = ["menamerai <rphananh@gmail.com>", "arnavkomaragiri <komaraac@mail.uc.edu>"]
+authors = ["menamerai <rphananh@gmail.com>", "arnavkomaragiri <komaraac@mail.uc.edu>", "ckinateder <calvinkinateder@gmail.com>"]
 readme = "README.md"
 # package-mode = false
 

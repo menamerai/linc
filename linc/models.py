@@ -32,7 +32,7 @@ class BaseModel(ABC):
             return OWA_PRED.UNK
 
     def evaluate_neurosymbolic(self, result: str) -> OWA_PRED:
-        lines = result.split("\n")
+        lines = [l for l in result.strip().split("\n") if len(l) != 0]
         fol_lines = lines[1::2]  # this is a hack but fuck it we ball
         fol_lines = [
             l[l.find(":") + 1 :].strip() for l in fol_lines

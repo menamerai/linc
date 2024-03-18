@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -152,8 +153,9 @@ class PromptGenerator:
                 example["conclusion_FOL"] = convert_to_nltk_rep(
                     example["conclusion_FOL"]
                 )
-
-        return examples[:n]
+        rel = examples[:n]
+        random.shuffle(rel)
+        return rel
 
     def __call__(self, mode: MODEL_MODE, s: str) -> str:
         return self.generate(mode, s)

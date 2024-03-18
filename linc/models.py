@@ -130,7 +130,8 @@ class GeminiModel(BaseModel):
                 ),
             )
             text = generation.text  # might be different for multiple candidates
-        except ValueError:
+        except Exception as e:
+            print(f"Exception: {e}")
             print("RATE LIMITED, TRYING AGAIN IN 1 MINUTE")
             sleep(60)
             self.predict(doc, counter=counter + 1)  # repredict after rate limit

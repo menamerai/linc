@@ -101,12 +101,17 @@ def test_n_samples(
 
 if __name__ == "__main__":
     train, test = get_dataset()
-    gemini_config = GeminiModelConfig(
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
+    # gemini_config = GeminiModelConfig(
+    #     google_api_key=os.getenv("GOOGLE_API_KEY"),
+    # )
+    # gemini_model = GeminiModel(gemini_config)
+    cohere_config = CohereModelConfig(
+        api_key=os.getenv("COHERE_API_KEY"),
+        model_name="command",
     )
-    gemini_model = GeminiModel(gemini_config)
+    cohere_model = CohereModel(cohere_config)
     y, yhat, filename = test_n_samples(
-        gemini_model, test, 360, sleep_time=5, file="gemini"
+        cohere_model, test, 360, sleep_time=5, file="cohere"
     )
     y = [i.value for i in y]
     yhat = [i.value for i in yhat]

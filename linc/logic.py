@@ -58,11 +58,13 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
     # parse the expressions into nltk Expression objects
     prem_exprs = [read_expr(format_fol(p)) for p in premises]
     conc_expr = read_expr(format_fol(conclusion))
+    print("PARSED CORRECTLY")
 
     # attempt to prove whether the conclusion is true from the premises
     try:
         conc_provable = prover.prove(conc_expr, prem_exprs)
     except Prover9FatalException as e:
+        print(e)
         return OWA_PRED.ERR
 
     # attempt to prove whether the conclusion is deniable from the premises
@@ -72,6 +74,8 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
             conc_expr.negate(), prem_exprs
         )
     except Prover9FatalException as e:
+        print("SECOND ERROR")
+        print(e)
         return OWA_PRED.ERR
 
     # return the according OWA flag

@@ -32,13 +32,16 @@ class BaseModel(ABC):
             return OWA_PRED.UNK
 
     def evaluate_neurosymbolic(self, result: str) -> OWA_PRED:
-        lines = [l for l in result.strip().split("\n") if len(l) != 0]
-        fol_lines = lines[1::2]  # this is a hack but fuck it we ball
-        fol_lines = [
-            l[l.find(":") + 1 :].strip() for l in fol_lines
-        ]  # hope you like debugging listcomps lmfao
-        premises, conclusion = fol_lines[:-1], fol_lines[-1]
-        return prove(premises, conclusion)
+        try:
+            lines = [l for l in result.strip().split("\n") if len(l) != 0]
+            fol_lines = lines[1::2]  # this is a hack but fuck it we ball
+            fol_lines = [
+                l[l.find(":") + 1 :].strip() for l in fol_lines
+            ]  # hope you like debugging listcomps lmfao
+            premises, conclusion = fol_lines[:-1], fol_lines[-1]
+            return prove(premises, conclusion)
+        except Exception as e:
+            return OWA_PRED.ERR
 
 
 class RandomModel(BaseModel):

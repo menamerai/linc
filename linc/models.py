@@ -1,5 +1,6 @@
 import re
 from abc import ABC
+from time import sleep
 
 import cohere
 import google.generativeai as genai
@@ -31,7 +32,9 @@ class BaseModel(ABC):
             # OWA assume uncertain
             return OWA_PRED.UNK
 
-    def evaluate_neurosymbolic(self, result: str, convert_to_nltk: bool = False) -> OWA_PRED:
+    def evaluate_neurosymbolic(
+        self, result: str, convert_to_nltk: bool = False
+    ) -> OWA_PRED:
         print("NEUROSYMBOLIC LOG BEGIN")
         print(result)
         try:
@@ -112,18 +115,25 @@ class GeminiModel(BaseModel):
         self.model = genai.GenerativeModel(config.model_name)
         self.pg = config.pg
 
-    def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
+    def predict(self, doc: dict[str, str | list[str]], counter: int = 0) -> OWA_PRED:
+        if counter > 5:
+            raise RuntimeError("Rate limited, try again later")
         prompt = self.pg.generate(self.config.mode, doc)
-        generation = self.model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                candidate_count=1,  # looks like multiple candidates are not supported
-                max_output_tokens=self.config.max_new_tokens,
-                # the stop sequences are NOT included in the output
-                stop_sequences=["</EVALUATE>"],
-            ),
-        )
-        text = generation.text  # might be different for multiple candidates
+        try:
+            generation = self.model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    candidate_count=1,  # looks like multiple candidates are not supported
+                    max_output_tokens=self.config.max_new_tokens,
+                    # the stop sequences are NOT included in the output
+                    stop_sequences=["</EVALUATE>"],
+                ),
+            )
+            text = generation.text  # might be different for multiple candidates
+        except ValueError:
+            print("RATE LIMITED, TRYING AGAIN IN 1 MINUTE")
+            sleep(60)
+            self.predict(doc, counter=counter + 1)  # repredict after rate limit
         text = text.strip()
         # since the generation stops at </EVALUATE>, and does not include the prompt
         # just generation.text is exactly what we need
@@ -169,7 +179,10 @@ class CohereModel(BaseModel):
             if self.config.mode == MODEL_MODE.BASELINE:
                 return [self.evaluate_baseline(g.text.strip()) for g in generation]
             elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
-                return [self.evaluate_neurosymbolic(g.text.strip(), convert_to_nltk=True) for g in generation]
+                return [
+                    self.evaluate_neurosymbolic(g.text.strip(), convert_to_nltk=True)
+                    for g in generation
+                ]
 
         else:
             raise ValueError("n must be a positive integer")
@@ -232,8 +245,7 @@ if __name__ == "__main__":
     # print(model.predict(example_doc))
 
     cohere_config = CohereModelConfig(
-        api_key=os.getenv("COHERE_API_KEY"),
-        mode=MODEL_MODE.NEUROSYMBOLIC
+        api_key=os.getenv("COHERE_API_KEY"), mode=MODEL_MODE.NEUROSYMBOLIC
     )
 
     model = CohereModel(cohere_config)

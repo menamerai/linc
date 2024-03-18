@@ -3,7 +3,7 @@ from copy import deepcopy
 from datetime import datetime as dt
 from time import sleep
 
-from custom_types import MODEL_MODE, OWA_PRED
+from custom_types import OWA_PRED
 from dataset import *
 from datasets import Dataset
 from dotenv import load_dotenv
@@ -67,7 +67,7 @@ def test_n_samples(
 
         correct = y == yhat
         text = (
-            f"Sample[{sample_id}]\n Question: {x}\n Answer: {y}"
+            f"Sample[{sample_id}]\n Question: {x['conclusion']}\n Premises: {x['premises']}\n Answer: {y}"
             f"\n Prediction: {yhat}\n Correct? {correct}\n"
         )
         print(text)

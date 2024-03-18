@@ -69,7 +69,7 @@ class PromptGenerator:
                     formatted_examples += f"TEXT: {premise}\n"
                     formatted_examples += f"FOL: {fol}\n"
 
-                formatted_examples += f"TEXT: {example['conclusion']}\n"
+                formatted_examples += f"CONCLUSION: {example['conclusion']}\n"
                 formatted_examples += f"FOL: {example['conclusion_FOL']}\n"
             formatted_examples += f"</EVALUATE>\n\n"
 

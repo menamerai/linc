@@ -31,16 +31,23 @@ class BaseModel(ABC):
             # OWA assume uncertain
             return OWA_PRED.UNK
 
-    def evaluate_neurosymbolic(self, result: str) -> OWA_PRED:
+    def evaluate_neurosymbolic(self, result: str, convert_to_nltk: bool = False) -> OWA_PRED:
+        print("NEUROSYMBOLIC LOG BEGIN")
+        print(result)
         try:
             lines = [l for l in result.strip().split("\n") if len(l) != 0]
             fol_lines = lines[1::2]  # this is a hack but fuck it we ball
             fol_lines = [
                 l[l.find(":") + 1 :].strip() for l in fol_lines
             ]  # hope you like debugging listcomps lmfao
+            if convert_to_nltk:
+                fol_lines = [convert_to_nltk_rep(l) for l in fol_lines]
+            print(fol_lines)
             premises, conclusion = fol_lines[:-1], fol_lines[-1]
+            print(conclusion)
             return prove(premises, conclusion)
         except Exception as e:
+            print(f"Exception: {e}")
             return OWA_PRED.ERR
 
 
@@ -62,7 +69,7 @@ class HFModel(BaseModel):
         self.pg = config.pg
         self.model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
-            quantization_config=config.q_config,
+            quantization_config=config.q_config if config.quantize else None,
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
             config.model_name, truncation_side="left"
@@ -156,13 +163,13 @@ class CohereModel(BaseModel):
             if self.config.mode == MODEL_MODE.BASELINE:
                 return self.evaluate_baseline(text)
             elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
-                return self.evaluate_neurosymbolic(text)
+                return self.evaluate_neurosymbolic(text, convert_to_nltk=True)
 
         elif n > 1:
             if self.config.mode == MODEL_MODE.BASELINE:
                 return [self.evaluate_baseline(g.text.strip()) for g in generation]
             elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
-                return [self.evaluate_neurosymbolic(g.text.strip()) for g in generation]
+                return [self.evaluate_neurosymbolic(g.text.strip(), convert_to_nltk=True) for g in generation]
 
         else:
             raise ValueError("n must be a positive integer")
@@ -204,15 +211,17 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    hf_config = HFModelConfig(
-        model_name="microsoft/phi-2",
-        quantize=True,
-        num_beams=5,
-    )
+    # hf_config = HFModelConfig(
+    #     # model_name="microsoft/phi-2",
+    #     model_name="deepseek-ai/deepseek-math-7b-instruct",
+    #     quantize=True,
+    #     num_beams=1,
+    #     mode=MODEL_MODE.NEUROSYMBOLIC
+    # )
 
-    model = HFModel(hf_config)
+    # model = HFModel(hf_config)
 
-    print(model.predict(example_doc))
+    # print(model.predict(example_doc))
 
     # gemini_config = GeminiModelConfig(
     #     google_api_key=os.getenv("GOOGLE_API_KEY"),
@@ -222,10 +231,11 @@ if __name__ == "__main__":
 
     # print(model.predict(example_doc))
 
-    # cohere_config = CohereModelConfig(
-    #     api_key=os.getenv("COHERE_API_KEY"),
-    # )
+    cohere_config = CohereModelConfig(
+        api_key=os.getenv("COHERE_API_KEY"),
+        mode=MODEL_MODE.NEUROSYMBOLIC
+    )
 
-    # model = CohereModel(cohere_config)
+    model = CohereModel(cohere_config)
 
-    # print(model.predict(example_doc, n=5))
+    print(model.predict(example_doc, n=5))

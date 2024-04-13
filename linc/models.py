@@ -35,7 +35,7 @@ class BaseModel(ABC):
     def evaluate_neurosymbolic(
         self, result: str, convert_to_nltk: bool = False
     ) -> OWA_PRED:
-        print("NEUROSYMBOLIC LOG BEGIN")
+        # print("NEUROSYMBOLIC LOG BEGIN")
         print(result)
         try:
             lines = [l for l in result.strip().split("\n") if len(l) != 0]
@@ -91,7 +91,7 @@ class HFModel(BaseModel):
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
         prompt = self.pg.generate(self.config.mode, doc)
-        generation = self.generator(prompt)[0]["generated_text"]
+        generations = [g["generated_text"] for g in self.generator(prompt)]
 
         # get LAST element between <EVALUATE> tags using regex
         # TODO: write different regex for neurosymbolic mode
@@ -100,9 +100,11 @@ class HFModel(BaseModel):
         )[-1]
         generation = generation.strip()
         if self.config.mode == MODEL_MODE.BASELINE:
-            return self.evaluate_baseline(generation)
+            results = [self.evaluate_baseline(g) for g in generations]
         elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
-            return self.evaluate_neurosymbolic(generation)
+            results = [self.evaluate_neurosymbolic(g) for g in generations]
+        votes, counts = np.unique(results, return_counts=True)
+        return votes[counts.argmax()]
 
 
 class GeminiModel(BaseModel):
@@ -166,6 +168,7 @@ class CohereModel(BaseModel):
             max_tokens=self.config.max_new_tokens,
             num_generations=n,
             model=self.config.model_name,
+            temperature=0
         )
 
         if n == 1:
@@ -174,16 +177,18 @@ class CohereModel(BaseModel):
             if self.config.mode == MODEL_MODE.BASELINE:
                 return self.evaluate_baseline(text)
             elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
-                return self.evaluate_neurosymbolic(text, convert_to_nltk=True)
+                return self.evaluate_neurosymbolic(text, convert_to_nltk=False)
 
         elif n > 1:
             if self.config.mode == MODEL_MODE.BASELINE:
-                return [self.evaluate_baseline(g.text.strip()) for g in generation]
+                results = [self.evaluate_baseline(g.text.strip()) for g in generation]
             elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
-                return [
-                    self.evaluate_neurosymbolic(g.text.strip(), convert_to_nltk=True)
+                results = [
+                    self.evaluate_neurosymbolic(g.text.strip(), convert_to_nltk=False)
                     for g in generation
                 ]
+            votes, counts = np.unique(results, return_counts=True)
+            return votes[counts.argmax()]
 
         else:
             raise ValueError("n must be a positive integer")
@@ -246,7 +251,8 @@ if __name__ == "__main__":
     # print(model.predict(example_doc))
 
     cohere_config = CohereModelConfig(
-        api_key=os.getenv("COHERE_API_KEY"), mode=MODEL_MODE.NEUROSYMBOLIC
+        api_key=os.getenv("COHERE_API_KEY"), mode=MODEL_MODE.NEUROSYMBOLIC,
+        model_name="command-r-plus"
     )
 
     model = CohereModel(cohere_config)

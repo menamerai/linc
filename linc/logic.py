@@ -64,7 +64,7 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
     try:
         conc_provable = prover.prove(conc_expr, prem_exprs)
     except Prover9FatalException as e:
-        print(e)
+        # print(e)
         return OWA_PRED.ERR
 
     # attempt to prove whether the conclusion is deniable from the premises
@@ -74,8 +74,8 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
             conc_expr.negate(), prem_exprs
         )
     except Prover9FatalException as e:
-        print("SECOND ERROR")
-        print(e)
+        # print("SECOND ERROR")
+        # print(e)
         return OWA_PRED.ERR
 
     # return the according OWA flag

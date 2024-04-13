@@ -31,7 +31,7 @@ class PromptGenerator:
         elif mode == MODEL_MODE.NEUROSYMBOLIC:
             prompt += "The task is to translate each of the premises and conclusions into FOL expressions, "
             prompt += "so that the expressions can be evaluated by a theorem solver to determine whether the conclusion follows from the premises."
-            prompt += "Expressions should be adhere to the format of the Python NLTK package logic module.\n\n"
+            prompt += "Expressions should be adhere to the format of the Python NLTK package logic module. Do NOT use special characters like ∃ or ∀. ONLY OUTPUT THE GENERATIONS SURROUNDED BY THE <EVALUATE> TAGS, DO NOT OUTPUT EXTRA TEXT.\n\n"
         else:
             raise ValueError(f"Invalid mode: {mode}, expected one of {self.modes}")
 

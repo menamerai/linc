@@ -9,7 +9,7 @@ from datasets import Dataset
 from dotenv import load_dotenv
 from lm import *
 from models import *
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 load_dotenv()
 
@@ -105,23 +105,33 @@ if __name__ == "__main__":
     #     google_api_key=os.getenv("GOOGLE_API_KEY"),
     # )
     # gemini_model = GeminiModel(gemini_config)
-    cohere_config = CohereModelConfig(
-        api_key=os.getenv("COHERE_API_KEY"),
-        model_name="command",
+    # cohere_config = CohereModelConfig(
+    #     api_key=os.getenv("COHERE_API_KEY"),
+    #     model_name="command",
+    # )
+    # cohere_model = CohereModel(cohere_config)
+    hf_config = HFModelConfig(
+        model_name="bigcode/starcoderplus",
+        quantize=True,
+        num_beams=5,
+        mode=MODEL_MODE.NEUROSYMBOLIC,
     )
-    cohere_model = CohereModel(cohere_config)
+    hf_model = HFModel(hf_config)
     y, yhat, filename = test_n_samples(
-        cohere_model, test, 360, sleep_time=5, file="cohere"
+        hf_model, test, 360, sleep_time=5, file="starcoderplus"
     )
     y = [i.value for i in y]
     yhat = [i.value for i in yhat]
     acc = accuracy_score(y, yhat)
     cf = confusion_matrix(y, yhat)
+    report = classification_report(y, yhat)
     print(f"Accuracy:\n\t{acc}")
     print(f"Confusion Matrix:\n{cf}")
+    print(f"Classification Report:\n{report}")
 
     if filename:
         with open(filename, "a") as f:
             f.write(f"Final Results\n")
             f.write(f"Accuracy: {acc}\n")
             f.write(f"Confusion Matrix: {cf}\n")
+            f.write(f"Classification Report: {report}\n")

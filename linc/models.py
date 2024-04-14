@@ -87,11 +87,14 @@ class HFModel(BaseModel):
             ),
             pad_token_id=self.tokenizer.eos_token_id,
             num_beams=config.num_beams,
+            device=0,
         )
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
         prompt = self.pg.generate(self.config.mode, doc)
         generations = [g["generated_text"] for g in self.generator(prompt)]
+        # print model device
+        print(f"Model device: {self.model.device}")
 
         # get LAST element between <EVALUATE> tags using regex
         generations = [
@@ -233,7 +236,7 @@ if __name__ == "__main__":
     hf_config = HFModelConfig(
         # model_name="microsoft/phi-2",
         model_name="deepseek-ai/deepseek-math-7b-instruct",
-        quantize=True,
+        quantize=False,
         num_beams=1,
         mode=MODEL_MODE.NEUROSYMBOLIC,
     )

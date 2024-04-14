@@ -1,3 +1,4 @@
+import argparse
 import os
 from copy import deepcopy
 from datetime import datetime as dt
@@ -44,6 +45,8 @@ def test_n_samples(
         file = (
             f"output/{file}_s{n_samples}_{dt.now().strftime('%d-%m-%Y_%H-%M-%S')}.txt"
         )
+        # make directory if it doesn't exist
+        os.makedirs(os.path.dirname(file), exist_ok=True)
 
     for row in data:
         if "answer" not in row or "question" not in row or "id" not in row:
@@ -80,45 +83,64 @@ def test_n_samples(
     return seqs["y"], seqs["yhat"], file
 
 
-# def compute_accuracy(y: List[OWA_PRED], yhat: List[OWA_PRED]) -> float:
-#     """Compute accuracy of the model with y and yhat
-
-#     Args:
-#         y (List[OWA_PRED]): _description_
-#         yhat (List[OWA_PRED]): _description_
-
-#     Returns:
-#         float: accuracy
-#     """
-#     if not y or not yhat or len(y) != len(yhat) or len(y) == 0 or len(yhat) == 0:
-#         raise ValueError("y and yhat must have the same length and not be empty")
-#     if not all(isinstance(i, OWA_PRED) for i in y):
-#         raise ValueError("y must be a list of OWA_PRED")
-#     if not all(isinstance(i, OWA_PRED) for i in yhat):
-#         raise ValueError("yhat must be a list of OWA_PRED")
-#     return sum([1 for i, j in zip(y, yhat) if i == j]) / len(y)
-
-
 if __name__ == "__main__":
+    args = argparse.ArgumentParser()
+    args.add_argument("--model_type", type=str, default="hf")
+    args.add_argument("--model_name", type=str, default="bigcode/starcoderplus")
+    args.add_argument("--quantize", type=bool, default=False)
+    args.add_argument("--num_beams", type=int, default=5)
+    args.add_argument("--mode", type=str, default="neurosymbolic")
+    args.add_argument("--sleep_time", type=int, default=0)
+    args.add_argument("--filename_suffix", type=str, default="")
+    args = args.parse_args()
+
     train, test = get_dataset()
-    # gemini_config = GeminiModelConfig(
-    #     google_api_key=os.getenv("GOOGLE_API_KEY"),
-    # )
-    # gemini_model = GeminiModel(gemini_config)
-    # cohere_config = CohereModelConfig(
-    #     api_key=os.getenv("COHERE_API_KEY"),
-    #     model_name="command",
-    # )
-    # cohere_model = CohereModel(cohere_config)
-    hf_config = HFModelConfig(
-        model_name="bigcode/starcoderplus",
-        quantize=True,
-        num_beams=5,
-        mode=MODEL_MODE.NEUROSYMBOLIC,
-    )
-    hf_model = HFModel(hf_config)
+
+    if args.mode == "neurosymbolic":
+        mode = MODEL_MODE.NEUROSYMBOLIC
+    elif args.mode == "baseline":
+        mode = MODEL_MODE.BASELINE
+    else:
+        raise ValueError(f"Invalid mode: {args.mode}")
+
+    # check if model is a hf model or gemini/cohere model
+    if args.model_type == "hf":
+        hf_config = HFModelConfig(
+            model_name=args.model_name,
+            quantize=args.quantize,
+            num_beams=args.num_beams,
+            mode=mode,
+        )
+        model = HFModel(hf_config)
+    elif args.model_type == "gemini":
+        gemini_config = GeminiModelConfig(
+            model_name=args.model_name,
+            google_api_key=os.getenv("GOOGLE_API_KEY"),
+            mode=mode,
+            max_new_tokens=4096,
+        )
+        model = GeminiModel(gemini_config)
+    elif args.model_type == "cohere":
+        cohere_config = CohereModelConfig(
+            model_name=args.model_name,
+            api_key=os.getenv("COHERE_API_KEY"),
+            mode=mode,
+            max_new_tokens=4096,
+        )
+        model = CohereModel(cohere_config)
+    else:
+        raise ValueError(f"Invalid model type: {args.model_type}")
+
+    os.makedirs("output", exist_ok=True)
+
+    if args.model_type == "hf":
+        # grab latter part of model_name
+        model_name = args.model_name.split("/")[-1] + "_" + args.filename_suffix
+    else:
+        model_name = args.model_name + "_" + args.filename_suffix
+
     y, yhat, filename = test_n_samples(
-        hf_model, test, 360, sleep_time=5, file="starcoderplus"
+        model, test, 360, sleep_time=args.sleep_time, file=model_name
     )
     y = [i.value for i in y]
     yhat = [i.value for i in yhat]

@@ -94,11 +94,11 @@ class HFModel(BaseModel):
         generations = [g["generated_text"] for g in self.generator(prompt)]
 
         # get LAST element between <EVALUATE> tags using regex
-        # TODO: write different regex for neurosymbolic mode
-        generation = re.findall(
-            rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", generation, re.DOTALL
-        )[-1]
-        generation = generation.strip()
+        generations = [
+            re.findall(rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", g, re.DOTALL)[-1]
+            for g in generations
+        ]
+        generations = [g.strip() for g in generations]
         if self.config.mode == MODEL_MODE.BASELINE:
             results = [self.evaluate_baseline(g) for g in generations]
         elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
@@ -168,7 +168,7 @@ class CohereModel(BaseModel):
             max_tokens=self.config.max_new_tokens,
             num_generations=n,
             model=self.config.model_name,
-            temperature=0
+            temperature=0,
         )
 
         if n == 1:
@@ -230,17 +230,17 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    # hf_config = HFModelConfig(
-    #     # model_name="microsoft/phi-2",
-    #     model_name="deepseek-ai/deepseek-math-7b-instruct",
-    #     quantize=True,
-    #     num_beams=1,
-    #     mode=MODEL_MODE.NEUROSYMBOLIC
-    # )
+    hf_config = HFModelConfig(
+        # model_name="microsoft/phi-2",
+        model_name="deepseek-ai/deepseek-math-7b-instruct",
+        quantize=True,
+        num_beams=1,
+        mode=MODEL_MODE.NEUROSYMBOLIC,
+    )
 
-    # model = HFModel(hf_config)
+    model = HFModel(hf_config)
 
-    # print(model.predict(example_doc))
+    print(model.predict(example_doc))
 
     # gemini_config = GeminiModelConfig(
     #     google_api_key=os.getenv("GOOGLE_API_KEY"),
@@ -250,11 +250,11 @@ if __name__ == "__main__":
 
     # print(model.predict(example_doc))
 
-    cohere_config = CohereModelConfig(
-        api_key=os.getenv("COHERE_API_KEY"), mode=MODEL_MODE.NEUROSYMBOLIC,
-        model_name="command-r-plus"
-    )
+    # cohere_config = CohereModelConfig(
+    #     api_key=os.getenv("COHERE_API_KEY"), mode=MODEL_MODE.NEUROSYMBOLIC,
+    #     model_name="command-r-plus"
+    # )
 
-    model = CohereModel(cohere_config)
+    # model = CohereModel(cohere_config)
 
-    print(model.predict(example_doc, n=5))
+    # print(model.predict(example_doc, n=5))

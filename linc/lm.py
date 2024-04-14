@@ -229,6 +229,14 @@ class HFModelConfig:
         default=1,  # 1 means greedy search
         metadata={"help": "Number of beams for the generation, used for beam search"},
     )
+    do_sample: bool = field(
+        default=False,
+        metadata={"help": "Whether to use sampling for the generation"},
+    )
+    temperature: float = field(
+        default=0.8,
+        metadata={"help": "Sampling temperature for the generation"},
+    )
 
 
 @dataclass
@@ -256,6 +264,14 @@ class GeminiModelConfig:
         default=1000,
         metadata={"help": "Maximum number of new tokens to generate"},
     )
+    temperature: float = field(
+        default=0.8,
+        metadata={"help": "Sampling temperature for the generation"},
+    )
+    top_p: float = field(
+        default=0.95,
+        metadata={"help": "Top p value for nucleus sampling"},
+    )
 
 
 @dataclass
@@ -282,6 +298,10 @@ class CohereModelConfig:
     max_new_tokens: int = field(
         default=1000,
         metadata={"help": "Maximum number of new tokens to generate"},
+    )
+    temperature: float = field(
+        default=0.8,
+        metadata={"help": "Sampling temperature for the generation"},
     )
 
 

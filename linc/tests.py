@@ -86,12 +86,16 @@ def test_n_samples(
 if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--model_type", type=str, default="hf")
+    # default model of gemini is gemini-prod, cohere is command
     args.add_argument("--model_name", type=str, default="bigcode/starcoderplus")
     args.add_argument("--quantize", type=bool, default=False)
     args.add_argument("--num_beams", type=int, default=5)
     args.add_argument("--mode", type=str, default="neurosymbolic")
     args.add_argument("--sleep_time", type=int, default=0)
     args.add_argument("--filename_suffix", type=str, default="")
+    args.add_argument("--do_sample", type=bool, default=False)
+    args.add_argument("--top_p", type=int, default=0.95)
+    args.add_argument("--temperature", type=float, default=0.8)
     args = args.parse_args()
 
     train, test = get_dataset()
@@ -105,12 +109,23 @@ if __name__ == "__main__":
 
     # check if model is a hf model or gemini/cohere model
     if args.model_type == "hf":
-        hf_config = HFModelConfig(
-            model_name=args.model_name,
-            quantize=args.quantize,
-            num_beams=args.num_beams,
-            mode=mode,
-        )
+        if args.do_sample:
+            hf_config = HFModelConfig(
+                model_name=args.model_name,
+                quantize=args.quantize,
+                num_beams=args.num_beams,
+                mode=mode,
+                do_sample=args.do_sample,
+                top_p=args.top_p,
+                temperature=args.temperature,
+            )
+        else:
+            hf_config = HFModelConfig(
+                model_name=args.model_name,
+                quantize=args.quantize,
+                num_beams=args.num_beams,
+                mode=mode,
+            )
         model = HFModel(hf_config)
     elif args.model_type == "gemini":
         gemini_config = GeminiModelConfig(
@@ -118,6 +133,7 @@ if __name__ == "__main__":
             google_api_key=os.getenv("GOOGLE_API_KEY"),
             mode=mode,
             max_new_tokens=4096,
+            temperature=args.temperature,
         )
         model = GeminiModel(gemini_config)
     elif args.model_type == "cohere":
@@ -126,6 +142,7 @@ if __name__ == "__main__":
             api_key=os.getenv("COHERE_API_KEY"),
             mode=mode,
             max_new_tokens=4096,
+            temperature=args.temperature,
         )
         model = CohereModel(cohere_config)
     else:

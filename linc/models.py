@@ -77,18 +77,35 @@ class HFModel(BaseModel):
         self.tokenizer = AutoTokenizer.from_pretrained(
             config.model_name, truncation_side="left"
         )
-        self.generator = pipeline(
-            "text-generation",
-            model=self.model,
-            tokenizer=self.tokenizer,
-            max_length=config.max_length,
-            stopping_criteria=StoppingCriteriaList(
-                [StopOnWords(self.pg.stop_words, self.tokenizer, config.device)]
-            ),
-            pad_token_id=self.tokenizer.eos_token_id,
-            num_beams=config.num_beams,
-            device=0,
-        )
+        if config.do_sample:
+            self.generator = pipeline(
+                "text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                max_length=config.max_length,
+                stopping_criteria=StoppingCriteriaList(
+                    [StopOnWords(self.pg.stop_words, self.tokenizer, config.device)]
+                ),
+                pad_token_id=self.tokenizer.eos_token_id,
+                num_beams=config.num_beams,
+                device=0,
+                do_sample=True,
+                top_p=config.top_p,
+                temperature=config.temperature,
+            )
+        else:
+            self.generator = pipeline(
+                "text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                max_length=config.max_length,
+                stopping_criteria=StoppingCriteriaList(
+                    [StopOnWords(self.pg.stop_words, self.tokenizer, config.device)]
+                ),
+                pad_token_id=self.tokenizer.eos_token_id,
+                num_beams=config.num_beams,
+                device=0,
+            )
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:
         prompt = self.pg.generate(self.config.mode, doc)
@@ -132,6 +149,7 @@ class GeminiModel(BaseModel):
                     max_output_tokens=self.config.max_new_tokens,
                     # the stop sequences are NOT included in the output
                     stop_sequences=["</EVALUATE>"],
+                    temperature=self.config.temperature,
                 ),
             )
             text = generation.text  # might be different for multiple candidates
@@ -171,7 +189,7 @@ class CohereModel(BaseModel):
             max_tokens=self.config.max_new_tokens,
             num_generations=n,
             model=self.config.model_name,
-            temperature=0,
+            temperature=self.config.temperature,
         )
 
         if n == 1:

@@ -10,7 +10,7 @@ from dspy.primitives.assertions import assert_transform_module, backtrack_handle
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-h", "--hf-model", type=str, default="")
+    parser.add_argument("-m", "--model", type=str, default="")
     return parser.parse_args()
 
 def load_proofwriter(dataset_name: str = "theoxo/proofwriter-deduction-balanced") -> DataLoader:
@@ -24,7 +24,7 @@ class FOLGen(dspy.Signature):
     Do NOT have extra text before the FOL expression.
     Do NOT use special characters like ∃ or ∀.
     Do NOT use strings like ~, <=>, or =>, use -, <->, and -> instead.
-    Do NOT use function definitions of operations (And(), Or()), use symbols instead (->, &, |)
+    Do NOT use function definitions of operations (And(), Or(), Not()), use symbols instead (&, |, -)
     Do NOT use symbols with multiple arities.
     Wrap all FOL expressions with <EVALUATE></EVALUATE> tags on their own line (<EVALUATE> is first line, </EVALUATE> is last line)"""
 
@@ -35,7 +35,7 @@ class FOLGen(dspy.Signature):
 class FOLGenerator(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.prog = dspy.ChainOfThought(FOLGen)
+        self.prog = dspy.Predict(FOLGen)
     
     def forward(self, theory, question, **kwargs):
         response = self.prog(theory=theory, question=question)
@@ -59,7 +59,7 @@ def fol_gen_metric(example, pred) -> int:
         # parse out terminal periods
         lines = [l[:-1] if l[-1] == '.' else l for l in lines]
         # yes I know this is hacky stfu
-        lines = [l.replace('~', '-') for l in lines]
+        # lines = [l.replace('~', '-') for l in lines]
         premises, conclusion = lines[1:-2], lines[-2]
         print("PREMISES:\n", premises)
         print("CONCLUSION:\n", conclusion)
@@ -82,8 +82,8 @@ def fol_gen_metric(example, pred) -> int:
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.hf_model == "":
-        lm = dspy.Cohere(model="command-r-plus", api_key=os.getenv("COHERE_API_KEY"), max_tokens=100000, stop_sequences=["</EVALUATE>"])
+    if args.model == "":
+        lm = dspy.Cohere(model="command-r-plus", api_key=os.getenv("COHERE_API_KEY"), max_tokens=10000, stop_sequences=["</EVALUATE>"])
     else:
         lm = dspy.HFModel(model=args.hf_model)
 
@@ -99,6 +99,7 @@ if __name__ == "__main__":
     fewshot_optimizer = BootstrapFewShotWithRandomSearch(metric=fol_gen_metric, max_bootstrapped_demos=2, num_candidate_programs=8, num_threads=1)
     your_dspy_program_compiled = fewshot_optimizer.compile(student = predictor_with_assertions, trainset=trainset)
 
+    your_dspy_program_compiled.save('optimized_program.json')
 
     # num_new_prompts_generated = 10
     # prompt_generation_temperature = 0.8

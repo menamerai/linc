@@ -39,6 +39,12 @@ class BaseModel(ABC):
         print(result)
         try:
             lines = [l for l in result.strip().split("\n") if len(l) != 0]
+            if "<EVALUATE>" in lines[0] and lines[0] != "<EVALUATE>":
+                print("GOTCHA YOU MOTHERFUCKER, THOUGHT YOU COULD TRICK ME")
+                rest = ' '.join(lines[0].split(' ')[1:])
+                lines = [rest] + lines[1:]
+            elif lines[0] == "<EVALUATE>":
+                lines = lines[1:]
             fol_lines = lines[1::2]  # this is a hack but fuck it we ball
             fol_lines = [
                 l[l.find(":") + 1 :].strip() for l in fol_lines
@@ -111,9 +117,9 @@ class HFModel(BaseModel):
         # print model device
         print(f"Model device: {self.model.device}")
 
-        # get LAST element between <EVALUATE> tags using regex
+        # get FIRST element between <EVALUATE> tags using regex
         generations = [
-            re.findall(rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", g, re.DOTALL)[-1]
+            re.findall(rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", g, re.DOTALL)[0]
             for g in generations
         ]
         generations = [g.strip() for g in generations]
@@ -175,12 +181,13 @@ class CohereModel(BaseModel):
         self.pg = config.pg
 
     def predict(
-        self, doc: dict[str, str | list[str]], n: int = 1
+        self, doc: dict[str, str | list[str]],
     ) -> OWA_PRED | list[OWA_PRED]:
-        prompt = self.pg.generate(self.config.mode, doc)
+        prompt = self.pg.generate(self.config.mode, doc, reason=self.config.reason)
         # generate is legacy, cohere is asking us to use chat instead
         # but chat doesn't have a stop_sequences parameter
         # read more here https://docs.cohere.com/docs/migrating-from-cogenerate-to-cochat
+        n = self.config.num_generations
         generation = self.model.generate(
             prompt,
             end_sequences=["</EVALUATE>"],
@@ -190,8 +197,16 @@ class CohereModel(BaseModel):
             temperature=self.config.temperature,
         )
 
+        print(generation[0].text)
+        generations = [
+            re.findall(rf"<EVALUATE>\n*(.+?)\n*<\/EVALUATE>", g.text, re.DOTALL)[0] if "</EVALUATE>" in g.text
+            else re.findall(rf"<EVALUATE>\n.*", g.text, re.DOTALL)[0]
+            for g in generation
+        ]
+        print("HI", generations)
+
         if n == 1:
-            text = generation[0].text
+            text = generations[0]
             text = text.strip()
             if self.config.mode == MODEL_MODE.BASELINE:
                 return self.evaluate_baseline(text)
@@ -200,11 +215,11 @@ class CohereModel(BaseModel):
 
         elif n > 1:
             if self.config.mode == MODEL_MODE.BASELINE:
-                results = [self.evaluate_baseline(g.text.strip()) for g in generation]
+                results = [self.evaluate_baseline(g.strip()) for g in generations]
             elif self.config.mode == MODEL_MODE.NEUROSYMBOLIC:
                 results = [
-                    self.evaluate_neurosymbolic(g.text.strip(), convert_to_nltk=False)
-                    for g in generation
+                    self.evaluate_neurosymbolic(g.strip(), convert_to_nltk=False)
+                    for g in generations
                 ]
             votes, counts = np.unique(results, return_counts=True)
             return votes[counts.argmax()]
@@ -249,17 +264,17 @@ if __name__ == "__main__":
         # "label": "True",
     }
 
-    hf_config = HFModelConfig(
-        # model_name="microsoft/phi-2",
-        model_name="deepseek-ai/deepseek-math-7b-instruct",
-        quantize=False,
-        num_beams=1,
-        mode=MODEL_MODE.NEUROSYMBOLIC,
-    )
+    # hf_config = HFModelConfig(
+    #     # model_name="microsoft/phi-2",
+    #     model_name="deepseek-ai/deepseek-math-7b-instruct",
+    #     quantize=False,
+    #     num_beams=1,
+    #     mode=MODEL_MODE.NEUROSYMBOLIC,
+    # )
 
-    model = HFModel(hf_config)
+    # model = HFModel(hf_config)
 
-    print(model.predict(example_doc))
+    # print(model.predict(example_doc))
 
     # gemini_config = GeminiModelConfig(
     #     google_api_key=os.getenv("GOOGLE_API_KEY"),
@@ -269,11 +284,11 @@ if __name__ == "__main__":
 
     # print(model.predict(example_doc))
 
-    # cohere_config = CohereModelConfig(
-    #     api_key=os.getenv("COHERE_API_KEY"), mode=MODEL_MODE.NEUROSYMBOLIC,
-    #     model_name="command-r-plus"
-    # )
+    cohere_config = CohereModelConfig(
+        api_key=os.getenv("COHERE_API_KEY"), mode=MODEL_MODE.NEUROSYMBOLIC,
+        model_name="command-r-plus", reason=True
+    )
 
-    # model = CohereModel(cohere_config)
+    model = CohereModel(cohere_config)
 
-    # print(model.predict(example_doc, n=5))
+    print(model.predict(example_doc))

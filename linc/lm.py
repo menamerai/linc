@@ -23,7 +23,7 @@ class PromptGenerator:
         """ self.dataset = load_dataset(self.train_dataset, split="train")
         self.n_indices = [23, 60, 125]  # true, false, uncertain """
 
-    def generate(self, mode: MODEL_MODE, doc: dict[str, str | list[str]]) -> str:
+    def generate(self, mode: MODEL_MODE, doc: dict[str, str | list[str]], reason: bool = False) -> str:
         # instructions
         prompt = self.common_instructions
         if mode == MODEL_MODE.BASELINE:
@@ -31,13 +31,18 @@ class PromptGenerator:
         elif mode == MODEL_MODE.NEUROSYMBOLIC:
             prompt += "The task is to translate each of the premises and conclusions into FOL expressions, "
             prompt += "so that the expressions can be evaluated by a theorem solver to determine whether the conclusion follows from the premises."
-            prompt += "Expressions should be adhere to the format of the Python NLTK package logic module. Do NOT use special characters like ∃ or ∀. ONLY OUTPUT THE GENERATIONS SURROUNDED BY THE <EVALUATE> TAGS, DO NOT OUTPUT EXTRA TEXT.\n\n"
+            prompt += "Expressions should be adhere to the format of the Python NLTK package logic module. Do NOT use special characters like ∃ or ∀.\n"
         else:
             raise ValueError(f"Invalid mode: {mode}, expected one of {self.modes}")
+         
+        if reason:
+            prompt += "MANDATORY RULE: FOL expressions CANNOT use the same names for variables and functions. Functions are followed by parenthesis (e.g. Ohio(...)), and variables are not.\n"
+            prompt += "Use the <REASONING> tags to think step by step and add additional non-reflexive premises to prove/disprove the conclusion. Do NOT output reflexive premises (e.g. all cars are cars) as new premises during reasoning.\n"
 
+        prompt += "ONLY OUTPUT THE GENERATIONS SURROUNDED BY THE <EVALUATE> TAGS, DO NOT OUTPUT EXTRA TEXT. Take a deep breath and get started.\n\n"
         # get examples
         if self.n_shots > 0:
-            prompt += self.get_and_format_example(mode)
+            prompt += self.get_and_format_example(mode, reason=reason)
 
         # write frame for problem
         prompt += "<PREMISES>\n"
@@ -47,11 +52,14 @@ class PromptGenerator:
         prompt += "<CONCLUSION>\n"
         prompt += doc["conclusion"] + "\n"
         prompt += "</CONCLUSION>\n"
-        prompt += "<EVALUATE>\n"
+        if reason:
+            prompt += "<REASONING>\n"
+        else:
+            prompt += "<EVALUATE>\n"
 
         return prompt
 
-    def get_and_format_example(self, mode: MODEL_MODE) -> str:
+    def get_and_format_example(self, mode: MODEL_MODE, reason: bool = False) -> str:
         examples = self.get_examples(mode, self.n_shots)
         formatted_examples = ""
         for example in examples:
@@ -62,6 +70,10 @@ class PromptGenerator:
             formatted_examples += "<CONCLUSION>\n"
             formatted_examples += example["conclusion"] + "\n"
             formatted_examples += "</CONCLUSION>\n"
+            if reason:
+                formatted_examples += "<REASONING>\n"
+                formatted_examples += example["reasoning"] + "\n"
+                formatted_examples += "</REASONING>\n"
             formatted_examples += "<EVALUATE>\n"
             if mode == MODEL_MODE.BASELINE:
                 formatted_examples += example["label"] + "\n"
@@ -93,6 +105,7 @@ class PromptGenerator:
                 "conclusion": "In La Liga 2021-2022, Real Madrid ranks higher than Barcelona.",
                 "conclusion_FOL": "HigherRank(RealMadrid, Barcelona)",
                 "label": "True",
+                "reasoning": "Let's think step by step. We know that a soccer team is a type of team, so we can add a premise that all La Liga soccer teams are also soccer teams. This is the only premise we can reasonably add, leaving us with our final premises:\nPREMISE: A La Liga soccer team ranks higher than another if it receives more points.\nPREMISE: If two La Liga soccer teams recieve the same points, the team which recieves more points from the games between the two teams ranks higher.\nPREMISE: Real Madrid and Barcelona are both La Liga soccer teams.\nPREMISE: In La Liga 2021-2022, Real Madrid recieves 86 points and Barcelona recieves 73 points.\nPREMISE: In La Liga 2021-2022, Real Madrid and Barcelona both recieve 3 points from the games between them.\nPREMISE: All La Liga soccer teams must also be soccer teams.",
                 "premises_FOL": [
                     "∀x ∀y (LaLiga(x) ∧ LaLiga(y) ∧ MorePoints(x, y) → HigherRank(x, y))",
                     "∀x ∀y (LaLiga(x) ∧ LaLiga(y) ∧ ¬MorePoints(x, y) ∧ ¬MorePoints(y, x) ∧ MorePointsInGameBetween(x, y) → HigherRank(x, y))",
@@ -113,6 +126,7 @@ class PromptGenerator:
                 "conclusion": "If Amy is not an Olympic gold medal winner, then Amy is a Nobel laureate.",
                 "conclusion_FOL": "-OlympicGoldMedalWinner(Amy) -> NobelLaureate(Amy)",
                 "label": "False",
+                "reasoning": "Let's think step by step. We know that a good athlete must also be an athlete, so we can add that to our list of premises. We also know that all Nobel laureates are good at science. This leaves us with our final premises:\nPREMISE: All athletes are good at sports.\nPREMISE: All Olympic gold medal winners are good athletes.\nPREMISE: No scientists are good at sports.\nPREMISE: All Nobel laureates are scientists.\nPREMISE: Amy is good at sports or Amy is an Olympic gold medal winner.\nPREMISE: If Amy is not a Nobel laureate, then Amy is not an Olympic gold medal winner.\nPREMISE: All good athletes are athletes.\nPREMISE: All Nobel laureates are good at science.",
                 "premises_FOL": [
                     "∀x (Athlete(x) → GoodAtSports(x))",
                     "∀x (OlympicGoldMedalWinner(x) → Athlete(x))",
@@ -134,6 +148,7 @@ class PromptGenerator:
                 "conclusion": "A worksheet is not dispensable.",
                 "conclusion_FOL": "-Dispensable(worksheet)",
                 "label": "Uncertain",
+                "reasoning": "Let's think step by step. Looking through our premises, we see that there are no ambiguous phrases that necessitate extra premises. Therefore, our premises are unchanged, leaving us with our final premises:\nPREMISE: All dispensable things are environment-friendly.\nPREMISE: All woodware is dispensable.\nPREMISE: All paper is woodware.\nPREMISE: No good things are bad.\nPREMISE: All environment-friendly things are good.\nPREMISE: A worksheet is either paper or is environment-friendly.",
                 "premises_FOL": [
                     "∀x (Dispensable(x) → EnvironmentFriendly(x))",
                     "∀x (Woodware(x) → Dispensable(x))",
@@ -287,9 +302,17 @@ class CohereModelConfig:
         default=PromptGenerator(),
         metadata={"help": "Prompt generator for the model"},
     )
+    num_generations: int = field(
+        default=5,
+        metadata={"help": "The number of generations to run"}
+    )
     mode: MODEL_MODE = field(
         default=MODEL_MODE.BASELINE,
         metadata={"help": "Mode of the model, between baseline and neurosymbolic"},
+    )
+    reason: bool = field(
+        default=False,
+        metadata={"help": "Whether to use chain-of-thought reasoning to add new premises"}
     )
     model_name: str = field(
         default="command",
@@ -335,5 +358,5 @@ if __name__ == "__main__":
         ],
         # "label": "True",
     }
-    prompt = prompt_gen.generate(MODEL_MODE.NEUROSYMBOLIC, example_doc)
+    prompt = prompt_gen.generate(MODEL_MODE.NEUROSYMBOLIC, example_doc, reason=True)
     print(prompt)

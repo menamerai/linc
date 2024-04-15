@@ -64,7 +64,7 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
     try:
         conc_provable = prover.prove(conc_expr, prem_exprs)
     except Prover9FatalException as e:
-        # print(e)
+        print(e)
         return OWA_PRED.ERR
 
     # attempt to prove whether the conclusion is deniable from the premises
@@ -74,8 +74,8 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
             conc_expr.negate(), prem_exprs
         )
     except Prover9FatalException as e:
-        # print("SECOND ERROR")
-        # print(e)
+        print("SECOND ERROR")
+        print(e)
         return OWA_PRED.ERR
 
     # return the according OWA flag
@@ -85,3 +85,28 @@ def prove(premises: List[str], conclusion: str) -> OWA_PRED:
         return OWA_PRED.FALSE
     else:
         return OWA_PRED.UNK
+
+def find_fol_errors(premises: List[str], conclusion: str) -> str:
+    # parse the expressions into nltk Expression objects
+    try:
+        prem_exprs = [read_expr(format_fol(p)) for p in premises]
+        conc_expr = read_expr(format_fol(conclusion))
+    except Exception as e:
+        return e
+    print("PARSED CORRECTLY")
+
+    # attempt to prove whether the conclusion is true from the premises
+    try:
+        conc_provable = prover.prove(conc_expr, prem_exprs)
+    except Prover9FatalException as e:
+        return e
+
+    # attempt to prove whether the conclusion is deniable from the premises
+    # this is a bit of a hack, but use short circuit eval to avoid second proving if possible
+    try:
+        conc_deniable = (not conc_provable) and prover.prove(
+            conc_expr.negate(), prem_exprs
+        )
+        return ""
+    except Prover9FatalException as e:
+        return e

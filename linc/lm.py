@@ -233,6 +233,10 @@ class HFModelConfig:
         default=0.8,
         metadata={"help": "Sampling temperature for the generation"},
     )
+    top_p: float = field(
+        default=0.95,
+        metadata={"help": "Top p value for nucleus sampling"},
+    )
 
 
 @dataclass

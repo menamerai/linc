@@ -252,6 +252,10 @@ class HFModelConfig:
         default=0.95,
         metadata={"help": "Top p value for nucleus sampling"},
     )
+    top_k: int = field(
+        default=0,
+        metadata={"help": "Top k choices to pick at each step for sampling"}
+    )
 
 
 @dataclass

@@ -112,18 +112,21 @@ if __name__ == "__main__":
 
     # check if model is a hf model or gemini/cohere model
     if args.model_type == "hf":
-        if args.q_4bit and not args.q_8bit:
+        if args.q_4bit:
+            print("Using 4-bit quantization")
             q_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.bfloat16,
             )
-        elif args.q_8bit and not args.q_4bit:
+        elif args.q_8bit:
+            print("Using 8-bit quantization")
             q_config = BitsAndBytesConfig(
                 load_in_8bit=True,
-                bnb_8bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_compute_dtype=torch.bfloat16,
             )
         else:
-            q_config = BitsAndBytesConfig(load_in_8bit=False)
+            print("Not quantizing model")
+            q_config = BitsAndBytesConfig()
         if args.do_sample:
             hf_config = HFModelConfig(
                 model_name=args.model_name,

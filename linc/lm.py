@@ -205,10 +205,6 @@ class HFModelConfig:
         default_factory=bnb_factory,
         metadata={"help": "Quantization configuration for the model"},
     )
-    quantize: bool = field(
-        default=False,
-        metadata={"help": "Whether to quantize the model or not"},
-    )
     mode: MODEL_MODE = field(
         default=MODEL_MODE.BASELINE,
         metadata={"help": "Mode of the model, between baseline and neurosymbolic"},

@@ -7,7 +7,7 @@ import google.generativeai as genai
 import numpy as np
 from custom_types import *
 from lm import *
-from logic import get_all_variables, prove
+from logic import prove
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -72,7 +72,7 @@ class HFModel(BaseModel):
         self.pg = config.pg
         self.model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
-            quantization_config=config.q_config if config.quantize else None,
+            quantization_config=config.q_config,
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
             config.model_name, truncation_side="left"
@@ -88,7 +88,6 @@ class HFModel(BaseModel):
                 ),
                 pad_token_id=self.tokenizer.eos_token_id,
                 num_beams=config.num_beams,
-                device=0,
                 do_sample=True,
                 top_p=config.top_p,
                 temperature=config.temperature,
@@ -104,7 +103,6 @@ class HFModel(BaseModel):
                 ),
                 pad_token_id=self.tokenizer.eos_token_id,
                 num_beams=config.num_beams,
-                device=0,
             )
 
     def predict(self, doc: dict[str, str | list[str]]) -> OWA_PRED:

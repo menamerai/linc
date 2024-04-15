@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from lm import *
 from models import *
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from transformers import BitsAndBytesConfig
 
 load_dotenv()
 
@@ -88,12 +89,14 @@ if __name__ == "__main__":
     args.add_argument("--model_type", type=str, default="hf")
     # default model of gemini is gemini-prod, cohere is command
     args.add_argument("--model_name", type=str, default="bigcode/starcoderplus")
-    args.add_argument("--quantize", type=bool, default=False)
+    # args.add_argument("--quantize", action="store_true")
+    args.add_argument("--q_4bit", action="store_true")
+    args.add_argument("--q_8bit", action="store_true")
     args.add_argument("--num_beams", type=int, default=5)
     args.add_argument("--mode", type=str, default="neurosymbolic")
     args.add_argument("--sleep_time", type=int, default=0)
     args.add_argument("--filename_suffix", type=str, default="")
-    args.add_argument("--do_sample", type=bool, default=False)
+    args.add_argument("--do_sample", action="store_true")
     args.add_argument("--top_p", type=int, default=0.95)
     args.add_argument("--temperature", type=float, default=0.8)
     args = args.parse_args()
@@ -109,22 +112,34 @@ if __name__ == "__main__":
 
     # check if model is a hf model or gemini/cohere model
     if args.model_type == "hf":
+        if args.q_4bit and not args.q_8bit:
+            q_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+        elif args.q_8bit and not args.q_4bit:
+            q_config = BitsAndBytesConfig(
+                load_in_8bit=True,
+                bnb_8bit_compute_dtype=torch.bfloat16,
+            )
+        else:
+            q_config = BitsAndBytesConfig(load_in_8bit=False)
         if args.do_sample:
             hf_config = HFModelConfig(
                 model_name=args.model_name,
-                quantize=args.quantize,
                 num_beams=args.num_beams,
                 mode=mode,
                 do_sample=args.do_sample,
                 top_p=args.top_p,
                 temperature=args.temperature,
+                q_config=q_config,
             )
         else:
             hf_config = HFModelConfig(
                 model_name=args.model_name,
-                quantize=args.quantize,
                 num_beams=args.num_beams,
                 mode=mode,
+                q_config=q_config,
             )
         model = HFModel(hf_config)
     elif args.model_type == "gemini":

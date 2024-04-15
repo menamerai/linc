@@ -126,7 +126,7 @@ if __name__ == "__main__":
             )
         else:
             print("Not quantizing model")
-            q_config = BitsAndBytesConfig()
+            q_config = BitsAndBytesConfig(bnb_4bit_compute_dtype=torch.bfloat16)
         if args.do_sample:
             hf_config = HFModelConfig(
                 model_name=args.model_name,
